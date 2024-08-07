@@ -167,3 +167,8 @@ EMAIL_PORT = config('EMAIL_PORT', default=587)
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='None')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='None')
 EMAIL_USE_TLS = True
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://dev.nitdgplug.org"
+]
