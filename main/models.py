@@ -179,15 +179,25 @@ class Profile(models.Model):
                 # Handle image field separately if it exists
                 if self.image:
                     try:
-                        # Copy the image file to the alumni image field
+                        # Try to get the file from the image field (new upload case)
                         alumni.image.save(
                             self.image.name,
                             self.image.file,
                             save=False
                         )
-                    except Exception as e:
-                        # If image copying fails, continue without image
-                        print(f"Warning: Could not copy profile image to alumni: {e}")
+                    except Exception:
+                        try:
+                            # If not a new upload, open the file from storage (existing image case)
+                            with open(self.image.path, 'rb') as f:
+                                from django.core.files.base import File
+                                alumni.image.save(
+                                    self.image.name,
+                                    File(f),
+                                    save=False
+                                )
+                        except Exception as e:
+                            # If image copying fails, continue without image
+                            print(f"Warning: Could not copy profile image to alumni: {e}")
                 
                 # Save the alumni instance
                 alumni.save()
