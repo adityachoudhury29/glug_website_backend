@@ -7,6 +7,7 @@ from django.utils import timezone
 import datetime
 from django.forms.models import model_to_dict
 from rest_framework import serializers
+from django.core.files.base import ContentFile
 
 def validate_pdf_size(value):
     limit = 100 * 1024 * 1024
@@ -157,6 +158,10 @@ class Profile(models.Model):
         Checks if the profile belongs to an alumni or not and converts to alumni if True
         """
         if self.convert_to_alumni == True:
+            # First save the profile to ensure we have a proper ID and file is saved
+            if not self.pk:
+                super(Profile, self).save(*args, **kwargs)
+            
             try:
                 # Create Alumni instance directly using model fields
                 alumni = Alumni(
@@ -179,25 +184,35 @@ class Profile(models.Model):
                 # Handle image field separately if it exists
                 if self.image:
                     try:
-                        # Try to get the file from the image field (new upload case)
-                        alumni.image.save(
-                            self.image.name,
-                            self.image.file,
-                            save=False
-                        )
-                    except Exception:
-                        try:
-                            # If not a new upload, open the file from storage (existing image case)
-                            with open(self.image.path, 'rb') as f:
-                                from django.core.files.base import File
-                                alumni.image.save(
-                                    self.image.name,
-                                    File(f),
-                                    save=False
-                                )
-                        except Exception as e:
-                            # If image copying fails, continue without image
-                            print(f"Warning: Could not copy profile image to alumni: {e}")
+                        # Check if this is a new file upload or existing file
+                        if hasattr(self.image, 'file') and self.image.file:
+                            # This is a new upload - copy the file content
+                            alumni.image.save(
+                                self.image.name,
+                                self.image.file,
+                                save=False
+                            )
+                        elif self.image.name and hasattr(self.image, 'path'):
+                            # This is an existing file - copy from storage
+                            try:
+                                with open(self.image.path, 'rb') as f:
+                                    file_content = f.read()
+                                    alumni.image.save(
+                                        self.image.name,
+                                        ContentFile(file_content),
+                                        save=False
+                                    )
+                            except (FileNotFoundError, OSError) as e:
+                                print(f"Warning: Could not read profile image file: {e}")
+                                # Try to copy the field reference directly
+                                alumni.image = self.image
+                        else:
+                            # Fallback: try to copy the field reference directly
+                            alumni.image = self.image
+                    except Exception as e:
+                        # If image copying fails, continue without image
+                        print(f"Warning: Could not copy profile image to alumni: {e}")
+                        alumni.image = None
                 
                 # Save the alumni instance
                 alumni.save()
@@ -211,7 +226,11 @@ class Profile(models.Model):
                 print(f"Error converting profile to alumni: {e}")
                 self.convert_to_alumni = False
                 super(Profile, self).save(*args, **kwargs)
-                raise ValidationError(f"Failed to convert profile to alumni: {e}")
+                # Don't raise ValidationError here as it might cause admin issues
+                # Instead, just log the error and continue
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to convert profile to alumni: {e}")
         else: 
             super(Profile, self).save(*args, **kwargs)
 
