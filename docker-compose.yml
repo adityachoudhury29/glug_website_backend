@@ -3,7 +3,7 @@ version: '3'
 services:
   
   db:
-    image: postgres:12
+    image: postgres:14
     deploy:
       restart_policy:
         condition: on-failure
@@ -22,8 +22,8 @@ services:
         delay: 5s
         max_attempts: 3
     command: >-
-      bash -c "python3 manage.py makemigrations && python3 manage.py migrate
-      --run-syncdb && python3 manage.py collectstatic --no-input && 
+      bash -c "python3 manage.py makemigrations && python3 manage.py migrate && 
+      python3 manage.py collectstatic --no-input && 
       gunicorn glug_website.wsgi:application --workers 3 --bind 0.0.0.0:8000"
     volumes:
       - ./media:/app/backend/media:rw
