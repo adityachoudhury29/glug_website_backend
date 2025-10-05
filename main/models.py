@@ -157,22 +157,51 @@ class Profile(models.Model):
         Checks if the profile belongs to an alumni or not and converts to alumni if True
         """
         if self.convert_to_alumni == True:
-                class AlumniSerializer(serializers.ModelSerializer):
-                    class Meta:
-                     model = Alumni
-                     fields = '__all__'
-
-                # Converting the Profile instance to Alumni instance
-                alumni_data = AlumniSerializer(self).data
-
-                # Creating a new Alumni instance from the serialized data
-                alumni_serializer = AlumniSerializer(data=alumni_data)
-                alumni_serializer.is_valid(raise_exception=True)
-                alumni_serializer.save()
-
-                # Deleting the Profile instance after converting it to Alumni
+            try:
+                # Create Alumni instance directly using model fields
+                alumni = Alumni(
+                    first_name=self.first_name,
+                    last_name=self.last_name,
+                    alias=self.alias,
+                    bio=self.bio,
+                    email=self.email,
+                    phone_number=self.phone_number,
+                    degree_name=self.degree_name,
+                    passout_year=self.passout_year,
+                    position=self.position,
+                    git_link=self.git_link,
+                    facebook_link=self.facebook_link,
+                    twitter_link=self.twitter_link,
+                    reddit_link=self.reddit_link,
+                    linkedin_link=self.linkedin_link,
+                )
+                
+                # Handle image field separately if it exists
+                if self.image:
+                    try:
+                        # Copy the image file to the alumni image field
+                        alumni.image.save(
+                            self.image.name,
+                            self.image.file,
+                            save=False
+                        )
+                    except Exception as e:
+                        # If image copying fails, continue without image
+                        print(f"Warning: Could not copy profile image to alumni: {e}")
+                
+                # Save the alumni instance
+                alumni.save()
+                
+                # Delete the Profile instance after converting it to Alumni
                 self.delete()
                 return
+                
+            except Exception as e:
+                # If conversion fails, reset the flag and save normally
+                print(f"Error converting profile to alumni: {e}")
+                self.convert_to_alumni = False
+                super(Profile, self).save(*args, **kwargs)
+                raise ValidationError(f"Failed to convert profile to alumni: {e}")
         else: 
             super(Profile, self).save(*args, **kwargs)
 

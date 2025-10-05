@@ -263,14 +263,34 @@ class CustomUserAdmin(UserAdmin):
 
 class ProfileAdmin(admin.ModelAdmin):
     list_display = ['first_name', 'user', 'email', 'passout_year']
+    exclude = ['convert_to_alumni']  # Hide the convert_to_alumni field from the form
     actions = [
         'convert_to_alumni',
     ]
 
     def convert_to_alumni(modeladmin, request, queryset):
+        converted_count = 0
+        error_count = 0
+        
         for profile in queryset:
-            profile.convert_to_alumni = True
-            profile.save(commit=True)
+            try:
+                profile.convert_to_alumni = True
+                profile.save()
+                converted_count += 1
+            except Exception as e:
+                error_count += 1
+                modeladmin.message_user(
+                    request, 
+                    f"Error converting profile {profile.first_name} {profile.last_name}: {e}",
+                    level='ERROR'
+                )
+        
+        if converted_count > 0:
+            modeladmin.message_user(
+                request, 
+                f"Successfully converted {converted_count} profile(s) to alumni.",
+                level='SUCCESS'
+            )
 
     convert_to_alumni.short_description = 'Convert to Alumni'
 
